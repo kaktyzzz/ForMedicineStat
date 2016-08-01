@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 #https://habrahabr.ru/post/202090/
+#http://scikit-learn.org/stable/auto_examples/model_selection/plot_roc.html
 
 from pandas import read_csv, DataFrame, Series
 from sklearn import cross_validation, svm
@@ -93,7 +94,7 @@ itog_val['OneVsRestClassifier'] = scores.mean()
 
 print itog_val
 
-ROCtrainTRN, ROCtestTRN, ROCtrainTRG, ROCtestTRG = cross_validation.train_test_split(train, target, test_size=0.5)
+ROCtrainTRN, ROCtestTRN, ROCtrainTRG, ROCtestTRG = cross_validation.train_test_split(train, target, test_size=0.7)
 ROCtestTRG = label_binarize(ROCtestTRG, classes=[1, 2, 3, 4])
 
 # #SVC
@@ -118,3 +119,8 @@ ROCanalize('LogisticRegression', ROCtestTRG, probas)
 #OneVsRestClassifier
 probas = model_ovrc.fit(ROCtrainTRN, ROCtrainTRG).decision_function(ROCtestTRN)
 ROCanalize('OneVsRestClassifier', ROCtestTRG, probas)
+
+# Прогнозируем при помощи построенной модели
+# model_rfc.fit(train, target)
+# result.insert(1,'Survived', model_rfc.predict(test))
+# result.to_csv('Kaggle_Titanic/Result/test.csv', index=False)
