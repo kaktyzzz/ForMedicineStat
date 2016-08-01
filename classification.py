@@ -6,6 +6,7 @@ from sklearn import cross_validation, svm
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
+from sklearn.multiclass import OneVsRestClassifier
 from sklearn.metrics import roc_curve, auc
 from sklearn.preprocessing import label_binarize
 from scipy import interp
@@ -76,6 +77,8 @@ model_rfc = RandomForestClassifier(n_estimators = 70) #в параметре п�
 model_knc = KNeighborsClassifier(n_neighbors = 18) #в параметре передаем кол-во соседей
 model_lr = LogisticRegression(penalty='l1', tol=0.01)
 model_svc = svm.SVC() #по умолчанию kernek='rbf'
+model_ovrc = OneVsRestClassifier(svm.SVC(kernel='linear', probability=True,
+                                 random_state=np.random.RandomState(0)))
 
 scores = cross_validation.cross_val_score(model_rfc, train, target, cv = kfold)
 itog_val['RandomForestClassifier'] = scores.mean()
@@ -85,6 +88,8 @@ scores = cross_validation.cross_val_score(model_lr, train, target, cv = kfold)
 itog_val['LogisticRegression'] = scores.mean()
 scores = cross_validation.cross_val_score(model_svc, train, target, cv = kfold)
 itog_val['SVC'] = scores.mean()
+scores = cross_validation.cross_val_score(model_ovrc, train, target, cv = kfold)
+itog_val['OneVsRestClassifier'] = scores.mean()
 
 print itog_val
 
@@ -110,4 +115,6 @@ ROCanalize('KNeighborsClassifier', ROCtestTRG, probas)
 probas = model_lr.fit(ROCtrainTRN, ROCtrainTRG).predict_proba(ROCtestTRN)
 ROCanalize('LogisticRegression', ROCtestTRG, probas)
 
-
+#OneVsRestClassifier
+probas = model_ovrc.fit(ROCtrainTRN, ROCtrainTRG).decision_function(ROCtestTRN)
+ROCanalize('OneVsRestClassifier', ROCtestTRG, probas)
