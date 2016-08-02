@@ -18,16 +18,17 @@ import pylab as pl
 def ROCanalize(classificator_name, test, prob):
     fpr = dict()
     tpr = dict()
+    trhd = dict()
     roc_auc = dict()
     n_classes = test.shape[1]
     pl.figure()
 
     for i in range(n_classes):
-        fpr[i], tpr[i], _ = roc_curve(test[:, i], prob[:, i])
+        fpr[i], tpr[i], trhd[i] = roc_curve(test[:, i], prob[:, i])
         roc_auc[i] = auc(fpr[i], tpr[i])
         pl.plot(fpr[i], tpr[i], label='class %d (area = %0.2f)' % (i, roc_auc[i]))
 
-    fpr["micro"], tpr["micro"], _ = roc_curve(test.ravel(), prob.ravel())
+    fpr["micro"], tpr["micro"], trhd["micro"] = roc_curve(test.ravel(), prob.ravel())
     roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
     pl.plot(fpr["micro"], tpr["micro"],
             label='micro-average ROC curve (area = {0:0.2f})'
@@ -68,8 +69,9 @@ def ROCanalize(classificator_name, test, prob):
 data = read_csv('pacient.csv', sep=';', header=None)
 
 target = data[2]
-train = data.drop([0, 1, 2], axis=1) #из исходных данных убираем
-
+excludeXbegin = 10
+excludeXlst = [i for i in range(excludeXbegin, len(data.count()))]
+train = data.drop([0, 1, 2] + excludeXlst, axis=1) #из исходных данных убираем
 kfold = 5 #количество подвыборок для валидации
 itog_val = {} #список для записи результатов кросс валидации разных алгоритмов
 
@@ -94,7 +96,7 @@ itog_val['OneVsRestClassifier'] = scores.mean()
 
 print itog_val
 
-ROCtrainTRN, ROCtestTRN, ROCtrainTRG, ROCtestTRG = cross_validation.train_test_split(train, target, test_size=0.7)
+ROCtrainTRN, ROCtestTRN, ROCtrainTRG, ROCtestTRG = cross_validation.train_test_split(train, target, test_size=0.25)
 ROCtestTRG = label_binarize(ROCtestTRG, classes=[1, 2, 3, 4])
 
 # #SVC
