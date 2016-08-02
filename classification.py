@@ -69,71 +69,56 @@ def ROCanalize(classificator_name, test, prob, pred):
     pl.ylabel('True Positive Rate')
     pl.title('ROC ' + classificator_name)
     pl.legend(loc=0, fontsize='small')
-    pl.show()
+    pl.savefig('ROC/' + classificator_name + '.png')
+    # pl.show()
 
 
 data = read_csv('pacient.csv', sep=';', header=None)
 
 target = data[2]
-excludeXbegin = 10
+excludeXbegin = 50
 excludeXlst = [i for i in range(excludeXbegin, len(data.count()))]
-train = data.drop([0, 1, 2] + excludeXlst, axis=1) #из исходных данных убираем
+train = data.drop([0, 1, 2] , axis=1) #из исходных данных убираем
 kfold = 5 #количество подвыборок для валидации
 itog_val = {} #список для записи результатов кросс валидации разных алгоритмов
 
+models = {}
+models['RandomForestClassifier'] = RandomForestClassifier(n_estimators = 70) #в параметре передаем кол-во деревьев
+models['KNeighborsClassifier'] = KNeighborsClassifier(n_neighbors = 18) #в параметре передаем кол-во соседей
+models['LogisticRegression'] = LogisticRegression(penalty='l1', tol=0.01)
+models['SVC'] = svm.SVC() #по умолчанию kernek='rbf'
+models['SVC'].probability = True
+# models['OneVsRestClassifier'] = OneVsRestClassifier(svm.SVC(kernel='linear', probability=True,
+#                                  random_state=np.random.RandomState(0)))
 
-model_rfc = RandomForestClassifier(n_estimators = 70) #в параметре передаем кол-во деревьев
-model_knc = KNeighborsClassifier(n_neighbors = 18) #в параметре передаем кол-во соседей
-model_lr = LogisticRegression(penalty='l1', tol=0.01)
-model_svc = svm.SVC() #по умолчанию kernek='rbf'
-model_ovrc = OneVsRestClassifier(svm.SVC(kernel='linear', probability=True,
-                                 random_state=np.random.RandomState(0)))
-
-scores = cross_validation.cross_val_score(model_rfc, train, target, cv = kfold)
-itog_val['RandomForestClassifier'] = scores.mean()
-scores = cross_validation.cross_val_score(model_knc, train, target, cv = kfold)
-itog_val['KNeighborsClassifier'] = scores.mean()
-scores = cross_validation.cross_val_score(model_lr, train, target, cv = kfold)
-itog_val['LogisticRegression'] = scores.mean()
-scores = cross_validation.cross_val_score(model_svc, train, target, cv = kfold)
-itog_val['SVC'] = scores.mean()
-scores = cross_validation.cross_val_score(model_ovrc, train, target, cv = kfold)
-itog_val['OneVsRestClassifier'] = scores.mean()
-
+for name, model in models.items():
+    scores = cross_validation.cross_val_score(model, train, target, cv = kfold)
+    itog_val[name] = scores.mean()
+print 'Кросс-валидация:'
 print itog_val
+print ''
 
-ROCtrainTRN, ROCtestTRN, ROCtrainTRG, ROCtestTRG = cross_validation.train_test_split(train, target, test_size=0.50)
+ROCtrainTRN, ROCtestTRN, ROCtrainTRG, ROCtestTRG = cross_validation.train_test_split(train, target, test_size=0.5)
 
+for name, model in models.items():
+    fit = model.fit(ROCtrainTRN, ROCtrainTRG)
+    probas = fit.predict_proba(ROCtestTRN)
+    pred = fit.predict(ROCtestTRN)
+    ROCanalize(name, ROCtestTRG, probas, pred)
+
+feature_importance = models['RandomForestClassifier'].feature_importances_
+print 'Влияние факторов, %:'
+for v in feature_importance.tolist():
+    print "%10f" % v
+print 'max: ' + str(feature_importance.max()) + ' min: ' + str(feature_importance.min())
+# print models['RandomForestClassifier'].feature_importances_.tolist()
 # #SVC
-model_svc.probability = True
-#probas = model_svc.fit(ROCtrainTRN, ROCtrainTRG).predict_proba(ROCtestTRN)
+# model_svc.probability = True
+# probas = model_svc.fit(ROCtrainTRN, ROCtrainTRG).predict_proba(ROCtestTRN)
 # fpr, tpr, thresholds = roc_curve(ROCtestTRG, probas[:, 1], pos_label=1)
 # roc_auc  = auc(fpr, tpr)
 # pl.plot(fpr, tpr, label='%s ROC (area = %0.2f)' % ('SVC', roc_auc))
 
-#RandomForestClassifier
-fit = model_rfc.fit(ROCtrainTRN, ROCtrainTRG)
-probas = fit.predict_proba(ROCtestTRN)
-pred = fit.predict(ROCtestTRN)
-ROCanalize('RandomForestClassifier', ROCtestTRG, probas, pred)
-
-#KNeighborsClassifier
-fit = model_knc.fit(ROCtrainTRN, ROCtrainTRG)
-probas = fit.predict_proba(ROCtestTRN)
-pred = fit.predict(ROCtestTRN)
-ROCanalize('KNeighborsClassifier', ROCtestTRG, probas, pred)
-
-#LogisticRegression
-fit = model_lr.fit(ROCtrainTRN, ROCtrainTRG)
-probas = fit.predict_proba(ROCtestTRN)
-pred = fit.predict(ROCtestTRN)
-ROCanalize('LogisticRegression', ROCtestTRG, probas, pred)
-
-#OneVsRestClassifier
-fit = model_ovrc.fit(ROCtrainTRN, ROCtrainTRG)
-probas = fit.decision_function(ROCtestTRN)
-pred = fit.predict(ROCtestTRN)
-ROCanalize('OneVsRestClassifier', ROCtestTRG, probas, pred)
 
 # Прогнозируем при помощи построенной модели
 # model_rfc.fit(train, target)
