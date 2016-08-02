@@ -8,27 +8,33 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.multiclass import OneVsRestClassifier
-from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import roc_curve, auc, classification_report
 from sklearn.preprocessing import label_binarize
 from scipy import interp
 import numpy as np
 import pylab as pl
 
 
-def ROCanalize(classificator_name, test, prob):
+def ROCanalize(classificator_name, test, prob, pred):
     fpr = dict()
     tpr = dict()
     trhd = dict()
     roc_auc = dict()
-    n_classes = test.shape[1]
+
     pl.figure()
 
+    print 'Classificator report for ' + classificator_name
+    print classification_report(test, pred, target_names=['pancreatitis class 1', 'pancreatitis class 2', 'pancreatitis class 3', 'pancreatitis class 4',])
+
+    test_bin = label_binarize(test, classes=[1, 2, 3, 4])
+    n_classes = test_bin.shape[1]
+
     for i in range(n_classes):
-        fpr[i], tpr[i], trhd[i] = roc_curve(test[:, i], prob[:, i])
+        fpr[i], tpr[i], trhd[i] = roc_curve(test_bin[:, i], prob[:, i])
         roc_auc[i] = auc(fpr[i], tpr[i])
         pl.plot(fpr[i], tpr[i], label='class %d (area = %0.2f)' % (i, roc_auc[i]))
 
-    fpr["micro"], tpr["micro"], trhd["micro"] = roc_curve(test.ravel(), prob.ravel())
+    fpr["micro"], tpr["micro"], trhd["micro"] = roc_curve(test_bin.ravel(), prob.ravel())
     roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
     pl.plot(fpr["micro"], tpr["micro"],
             label='micro-average ROC curve (area = {0:0.2f})'
@@ -96,8 +102,7 @@ itog_val['OneVsRestClassifier'] = scores.mean()
 
 print itog_val
 
-ROCtrainTRN, ROCtestTRN, ROCtrainTRG, ROCtestTRG = cross_validation.train_test_split(train, target, test_size=0.25)
-ROCtestTRG = label_binarize(ROCtestTRG, classes=[1, 2, 3, 4])
+ROCtrainTRN, ROCtestTRN, ROCtrainTRG, ROCtestTRG = cross_validation.train_test_split(train, target, test_size=0.50)
 
 # #SVC
 model_svc.probability = True
@@ -107,20 +112,28 @@ model_svc.probability = True
 # pl.plot(fpr, tpr, label='%s ROC (area = %0.2f)' % ('SVC', roc_auc))
 
 #RandomForestClassifier
-probas = model_rfc.fit(ROCtrainTRN, ROCtrainTRG).predict_proba(ROCtestTRN)
-ROCanalize('RandomForestClassifier', ROCtestTRG, probas)
+fit = model_rfc.fit(ROCtrainTRN, ROCtrainTRG)
+probas = fit.predict_proba(ROCtestTRN)
+pred = fit.predict(ROCtestTRN)
+ROCanalize('RandomForestClassifier', ROCtestTRG, probas, pred)
 
 #KNeighborsClassifier
-probas = model_knc.fit(ROCtrainTRN, ROCtrainTRG).predict_proba(ROCtestTRN)
-ROCanalize('KNeighborsClassifier', ROCtestTRG, probas)
+fit = model_knc.fit(ROCtrainTRN, ROCtrainTRG)
+probas = fit.predict_proba(ROCtestTRN)
+pred = fit.predict(ROCtestTRN)
+ROCanalize('KNeighborsClassifier', ROCtestTRG, probas, pred)
 
 #LogisticRegression
-probas = model_lr.fit(ROCtrainTRN, ROCtrainTRG).predict_proba(ROCtestTRN)
-ROCanalize('LogisticRegression', ROCtestTRG, probas)
+fit = model_lr.fit(ROCtrainTRN, ROCtrainTRG)
+probas = fit.predict_proba(ROCtestTRN)
+pred = fit.predict(ROCtestTRN)
+ROCanalize('LogisticRegression', ROCtestTRG, probas, pred)
 
 #OneVsRestClassifier
-probas = model_ovrc.fit(ROCtrainTRN, ROCtrainTRG).decision_function(ROCtestTRN)
-ROCanalize('OneVsRestClassifier', ROCtestTRG, probas)
+fit = model_ovrc.fit(ROCtrainTRN, ROCtrainTRG)
+probas = fit.decision_function(ROCtestTRN)
+pred = fit.predict(ROCtestTRN)
+ROCanalize('OneVsRestClassifier', ROCtestTRG, probas, pred)
 
 # Прогнозируем при помощи построенной модели
 # model_rfc.fit(train, target)
