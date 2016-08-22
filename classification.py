@@ -23,8 +23,9 @@ def ROCanalize(classificator_name, test, prob, pred):
 
     pl.figure()
 
-    print 'Classificator report for ' + classificator_name
-    print classification_report(test, pred, target_names=['pancreatitis class 1', 'pancreatitis class 2', 'pancreatitis class 3', 'pancreatitis class 4',])
+    class_names = ['class 1 OGSK', 'class 2 Pancreonekros', 'class 3 Pancreotogenniy abscess', 'class 4 Kista',]
+    print 'Classificator report for || ' + classificator_name
+    print classification_report(test, pred, target_names=class_names)
 
     test_bin = label_binarize(test, classes=[1, 2, 3, 4])
     n_classes = test_bin.shape[1]
@@ -32,7 +33,7 @@ def ROCanalize(classificator_name, test, prob, pred):
     for i in range(n_classes):
         fpr[i], tpr[i], trhd[i] = roc_curve(test_bin[:, i], prob[:, i])
         roc_auc[i] = auc(fpr[i], tpr[i])
-        pl.plot(fpr[i], tpr[i], label='class %d (area = %0.2f)' % (i, roc_auc[i]))
+        pl.plot(fpr[i], tpr[i], label='%s (area = %0.2f)' % (class_names[i], roc_auc[i]))
 
     fpr["micro"], tpr["micro"], trhd["micro"] = roc_curve(test_bin.ravel(), prob.ravel())
     roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
@@ -69,48 +70,101 @@ def ROCanalize(classificator_name, test, prob, pred):
     pl.ylabel('True Positive Rate')
     pl.title('ROC ' + classificator_name)
     pl.legend(loc=0, fontsize='small')
-    pl.savefig('ROC/' + classificator_name + '.png')
+    pl.savefig('ROC4/' + classificator_name + '.png')
     # pl.show()
 
+def selectKImportance(model, X, k=5):
+    return X[:, model.feature_importances_.argsort()[::-1][:k]]
 
-data = read_csv('pacient.csv', sep=';', header=None)
+groups_factors_on_enter = {}
+groups_factors_on_enter['01:an'] = range(11, 17)
+groups_factors_on_enter['02:zh'] = [17, 18, 20] + range(21-30) + [31, 33]
+groups_factors_on_enter['03:obj'] = [35, 37, 39, 41, 43, 45, 47] + range(49, 55) + [61, 63, 65, 67, 69, 71, 73, 75, 77]
+groups_factors_on_enter['04:pon'] = range(79, 85)
+groups_factors_on_enter['05:oak'] = [85, 87, 89, 91, 93, 95, 97]
+groups_factors_on_enter['06:bak'] = [99, 101, 103, 105, 107, 109, 111, 113]
+groups_factors_on_enter['07:am'] = [115, 117]
+groups_factors_on_enter['08:cr'] = [119]
+groups_factors_on_enter['09:orobk'] = range(129, 137)
+groups_factors_on_enter['10:uzi'] = [137] + range(139, 142) + [212]
+groups_factors_on_enter['11:egdc'] = range(219, 228)
+# groups_factors_on_enter['euzi']
+groups_factors_on_enter['12:pabbi'] = range(323, 325)
+groups_factors_on_enter['13:pabci'] = range(325, 332)
+groups_factors_on_enter['14:pabaa'] = [332]
+# groups_factors_on_enter['krg']
+# groups_factors_on_enter['bim']
+groups_factors_before_operate = {}
+groups_factors_before_operate['01:an'] = range(11, 17)
+groups_factors_before_operate['02:zh'] = [17, 18, 20] + range(21-29) + [30, 32, 34]
+groups_factors_before_operate['03:obj'] = [36, 38, 40, 42, 44, 46, 48] + range(55, 61) + [62, 64, 66, 68, 70, 72, 74, 76, 78]
+groups_factors_before_operate['04:pon'] = range(79, 85)
+groups_factors_before_operate['05:oak'] = [86, 88, 90, 92, 94, 96, 98]
+groups_factors_before_operate['06:bak'] = [100, 102, 104, 106, 108, 110, 112, 114]
+groups_factors_before_operate['07:am'] = [116, 118]
+groups_factors_before_operate['08:cr'] = [120]
+groups_factors_before_operate['09:orogk'] = range(121, 129)
+groups_factors_before_operate['10:orobk'] = range(129, 137)
+groups_factors_before_operate['11:uzi'] = [137, 138] + range(139, 142) + range(142, 219)
+groups_factors_before_operate['12:egdc'] = range(219, 228)
+groups_factors_before_operate['13:euzi'] = range(228, 323)
+groups_factors_before_operate['14:pabbi'] = range(323, 325)
+groups_factors_before_operate['15:pabci'] = range(325, 332)
+groups_factors_before_operate['16:pabaa'] = [332]
+groups_factors_before_operate['17:krg'] = range(333, 340)
+groups_factors_before_operate['18:bim'] = range(340, 389)
 
-target = data[2]
-excludeXbegin = 50
-excludeXlst = [i for i in range(excludeXbegin, len(data.count()))]
-train = data.drop([0, 1, 2] , axis=1) #из исходных данных убираем
+data = read_csv('pacient.csv', sep=';', header=0)
+# header = read_csv('pacient-header.csv', sep=';', header=None)
+
+target = data.iloc[:, 2]
+# target1 = data['Forma ODP']
 kfold = 5 #количество подвыборок для валидации
 itog_val = {} #список для записи результатов кросс валидации разных алгоритмов
-
 models = {}
-models['RandomForestClassifier'] = RandomForestClassifier(n_estimators = 70) #в параметре передаем кол-во деревьев
-models['KNeighborsClassifier'] = KNeighborsClassifier(n_neighbors = 18) #в параметре передаем кол-во соседей
-models['LogisticRegression'] = LogisticRegression(penalty='l1', tol=0.01)
-models['SVC'] = svm.SVC() #по умолчанию kernek='rbf'
-models['SVC'].probability = True
-# models['OneVsRestClassifier'] = OneVsRestClassifier(svm.SVC(kernel='linear', probability=True,
-#                                  random_state=np.random.RandomState(0)))
+getlist = []
+name_groups = ''
+# train = data.iloc[:, 2:]
+data_droped = data.drop(['nomer'] , axis=1) #из исходных данных убираем
+for name_group in sorted(groups_factors_before_operate.keys()):
+    getlist += groups_factors_before_operate[name_group]
+    name_groups += '+' + name_group
+    train = data_droped.iloc[:, getlist]
+    # print train.values
+    models['RandomForestClassifier'] = RandomForestClassifier(n_estimators = 70) #в параметре передаем кол-во деревьев
+    models['KNeighborsClassifier'] = KNeighborsClassifier(n_neighbors = 18) #в параметре передаем кол-во соседей
+    models['LogisticRegression'] = LogisticRegression(penalty='l1', tol=0.01)
+    models['SVC'] = svm.SVC() #по умолчанию kernek='rbf'
+    models['SVC'].probability = True
+    # models['OneVsRestClassifier'] = OneVsRestClassifier(svm.SVC(kernel='linear', probability=True,
+    #                                  random_state=np.random.RandomState(0)))
 
-for name, model in models.items():
-    scores = cross_validation.cross_val_score(model, train, target, cv = kfold)
-    itog_val[name] = scores.mean()
-print 'Кросс-валидация:'
-print itog_val
-print ''
+    for name, model in models.items():
+        scores = cross_validation.cross_val_score(model, train, target, cv = kfold)
+        itog_val[name] = scores.mean()
+    print 'Кросс-валидация:'
+    print itog_val
+    print ''
 
-ROCtrainTRN, ROCtestTRN, ROCtrainTRG, ROCtestTRG = cross_validation.train_test_split(train, target, test_size=0.5)
+    ROCtrainTRN, ROCtestTRN, ROCtrainTRG, ROCtestTRG = cross_validation.train_test_split(train, target, test_size=0.5)
 
-for name, model in models.items():
-    fit = model.fit(ROCtrainTRN, ROCtrainTRG)
-    probas = fit.predict_proba(ROCtestTRN)
-    pred = fit.predict(ROCtestTRN)
-    ROCanalize(name, ROCtestTRG, probas, pred)
+    for name, model in models.items():
+        fit = model.fit(ROCtrainTRN, ROCtrainTRG)
+        probas = fit.predict_proba(ROCtestTRN)
+        pred = fit.predict(ROCtestTRN)
+        ROCanalize(name_groups + ' | ' + name, ROCtestTRG, probas, pred)
 
-feature_importance = models['RandomForestClassifier'].feature_importances_
-print 'Влияние факторов, %:'
-for v in feature_importance.tolist():
-    print "%10f" % v
-print 'max: ' + str(feature_importance.max()) + ' min: ' + str(feature_importance.min())
+    feature_importance = models['RandomForestClassifier'].feature_importances_
+    names_feature = list(ROCtrainTRN.columns.values)
+    f_i_zipped = zip(names_feature, feature_importance.tolist())
+    f_i_zipped.sort(key = lambda t:t[1], reverse=True)
+    print 'Влияние факторов [top 10], %:'
+    for n, f in f_i_zipped[:10]:
+        print " %10f - %s" % (f, n)
+    print 'max: ' + str(feature_importance.max()) + ' min: ' + str(feature_importance.min())
+    print '---' * 10
+    print ''
+    print ''
 # print models['RandomForestClassifier'].feature_importances_.tolist()
 # #SVC
 # model_svc.probability = True
