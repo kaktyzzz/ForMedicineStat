@@ -8,11 +8,37 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.multiclass import OneVsRestClassifier
-from sklearn.metrics import roc_curve, auc, classification_report
+from sklearn.metrics import roc_curve, auc, classification_report, confusion_matrix
 from sklearn.preprocessing import label_binarize
 from scipy import interp
 import numpy as np
 import pylab as pl
+
+def stat(true, pred, classificator_name):
+    class_names = ['class 1 OGSK', 'class 2 Pancreonekros', 'class 3 Pancreotogenniy abscess', 'class 4 Kista', ]
+    print 'Classificator report for || ' + classificator_name
+    print classification_report(true, pred, target_names=class_names)
+    confusion = confusion_matrix(true, pred)
+    for i in range(0, len(confusion)):
+        tp = confusion[i][i]
+        tn = 0
+        fp = 0
+        fn = 0
+        for j in range(0, len(confusion)):
+            tn += confusion[j][j]
+            fn += confusion[i][j]
+            fp += confusion[j][i]
+        tn -= tp
+        fp -= tp
+        fn -= tp
+
+        se = tp / (tp + fn)  # = tpr
+        sp = tn / (tn + fp)  # = tnr
+        ac = (tp + tn) / (tp + tn + fp + fn)
+        pvp = tp / (tp + fp)  # precision
+        pvn = tn / (tn + fn)
+
+        print '%s: se = %5f sp = %5f ac = %5f +pv = %5f -pv = %5f' % (class_names[i], se, sp, ac, pvp, pvn)
 
 
 def ROCanalize(classificator_name, test, prob, pred):
@@ -23,9 +49,7 @@ def ROCanalize(classificator_name, test, prob, pred):
 
     pl.figure()
 
-    class_names = ['class 1 OGSK', 'class 2 Pancreonekros', 'class 3 Pancreotogenniy abscess', 'class 4 Kista',]
-    print 'Classificator report for || ' + classificator_name
-    print classification_report(test, pred, target_names=class_names)
+    stat(test, pred, classificator_name)
 
     test_bin = label_binarize(test, classes=[1, 2, 3, 4])
     n_classes = test_bin.shape[1]
