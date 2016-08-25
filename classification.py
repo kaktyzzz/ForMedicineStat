@@ -48,48 +48,60 @@ def ROCanalize(classificator_name, test, prob, pred):
     tpr = dict()
     trhd = dict()
     roc_auc = dict()
-    class_names = ['class 1 OGSK', 'class 2 Pancreonekros', 'class 3 Pancreotogenniy abscess', 'class 4 Kista', ]
+    # class_names_all = ['class 1 OGSK', 'class 2 Pancreonekros', 'class 3 Pancreotogenniy abscess', 'class 4 Kista', ]
+    class_names_all = ['class 1 Sterilniy', 'class 2 Inficirovanniy']
+    class_ind = list(set(test))
+    class_names = []
+    for i in class_ind:
+        class_names += [class_names_all[i-1]]
 
     pl.figure()
 
     stat(test, pred, classificator_name, class_names)
 
-    test_bin = label_binarize(test, classes=[1, 2, 3, 4])
+    test_bin = label_binarize(test, classes=class_ind)
+    test_bin_temp = np.copy(test_bin)
+    for l in test_bin_temp:
+        if l[0] == 0:
+            l[0] = 1
+        else:
+            l[0] = 0
+    test_bin = np.concatenate((test_bin, test_bin_temp), axis=1)
+
     n_classes = test_bin.shape[1]
 
     for i in range(n_classes):
-        if i in test: # ЕСли есть такой классс в трушной выборке
-            fpr[i], tpr[i], trhd[i] = roc_curve(test_bin[:, i], prob[:, i])
-            roc_auc[i] = auc(fpr[i], tpr[i])
-            pl.plot(fpr[i], tpr[i], label='%s (area = %0.2f)' % (class_names[i], roc_auc[i]))
+        fpr[i], tpr[i], trhd[i] = roc_curve(test_bin[:, i], prob[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
+        pl.plot(fpr[i], tpr[i], label='%s (area = %0.2f)' % (class_names[i], roc_auc[i]))
 
-    # fpr["micro"], tpr["micro"], trhd["micro"] = roc_curve(test_bin.ravel(), prob.ravel())
-    # roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
-    # pl.plot(fpr["micro"], tpr["micro"],
-    #         label='micro-average ROC curve (area = {0:0.2f})'
-    #               ''.format(roc_auc["micro"]),
-    #         linewidth=2)
-    #
-    # # Compute macro-average ROC curve and ROC area
-    #
-    # # First aggregate all false positive rates
-    # all_fpr = np.unique(np.concatenate([fpr[i] for i in range(n_classes)]))
-    #
-    # # Then interpolate all ROC curves at this points
-    # mean_tpr = np.zeros_like(all_fpr)
-    # for i in range(n_classes):
-    #     mean_tpr += interp(all_fpr, fpr[i], tpr[i])
-    #
-    # # Finally average it and compute AUC
-    # mean_tpr /= n_classes
-    # fpr["macro"] = all_fpr
-    # tpr["macro"] = mean_tpr
-    # roc_auc["macro"] = auc(fpr["macro"], tpr["macro"])
+    fpr["micro"], tpr["micro"], trhd["micro"] = roc_curve(test_bin.ravel(), prob.ravel())
+    roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
+    pl.plot(fpr["micro"], tpr["micro"],
+            label='micro-average ROC curve (area = {0:0.2f})'
+                  ''.format(roc_auc["micro"]),
+            linewidth=2)
 
-    # pl.plot(fpr["macro"], tpr["macro"],
-    #          label='macro-average ROC curve (area = {0:0.2f})'
-    #                ''.format(roc_auc["macro"]),
-    #          linewidth=2)
+    # Compute macro-average ROC curve and ROC area
+
+    # First aggregate all false positive rates
+    all_fpr = np.unique(np.concatenate([fpr[i] for i in range(n_classes)]))
+
+    # Then interpolate all ROC curves at this points
+    mean_tpr = np.zeros_like(all_fpr)
+    for i in range(n_classes):
+        mean_tpr += interp(all_fpr, fpr[i], tpr[i])
+
+    # Finally average it and compute AUC
+    mean_tpr /= n_classes
+    fpr["macro"] = all_fpr
+    tpr["macro"] = mean_tpr
+    roc_auc["macro"] = auc(fpr["macro"], tpr["macro"])
+
+    pl.plot(fpr["macro"], tpr["macro"],
+             label='macro-average ROC curve (area = {0:0.2f})'
+                   ''.format(roc_auc["macro"]),
+             linewidth=2)
 
     pl.plot([0, 1], [0, 1], 'k--')
     pl.xlim([0.0, 1.0])
@@ -98,7 +110,7 @@ def ROCanalize(classificator_name, test, prob, pred):
     pl.ylabel('True Positive Rate')
     pl.title('ROC ' + classificator_name)
     pl.legend(loc=0, fontsize='small')
-    pl.savefig('ROC11/' + classificator_name + '.png')
+    pl.savefig('ROC16/' + classificator_name + '.png')
     # pl.show()
 
 
@@ -143,9 +155,9 @@ groups_factors_before_operate['18:bim'] = range(340, 389)
 data = read_csv('pacient.csv', sep=';', header=0)
 # header = read_csv('pacient-header.csv', sep=';', header=None)
 
-row_droped = data.loc[data['Nalichie inficirovanija'] == 1] # 1 - STERILNIY, 2 - INFICIROVANNIY
-target = row_droped.iloc[:, 2]
-# target1 = data['Forma ODP']
+# row_droped = data.loc[data['Nalichie inficirovanija'] == 1] # 1 - STERILNIY, 2 - INFICIROVANNIY
+target = data.iloc[:, 3]
+
 kfold = 5 #количество подвыборок для валидации
 itog_val = {} #список для записи результатов кросс валидации разных алгоритмов
 models = {}
@@ -153,14 +165,13 @@ getlist = []
 name_groups = ''
 
 # train = data.iloc[:, 2:]
-data_droped = row_droped.drop(['nomer'] , axis=1) #из исходных данных убираем
+data_droped = data.drop(['nomer'] , axis=1) #из исходных данных убираем
 for name_group in sorted(groups_factors_before_operate.keys()):
     getlist += groups_factors_before_operate[name_group]
     name_groups += '+' + name_group
 
 
-    train = row_droped.iloc[:, getlist]
-
+    train = data_droped.iloc[:, getlist]
 
     models['RandomForestClassifier'] = RandomForestClassifier(n_estimators = 70) #в параметре передаем кол-во деревьев
     models['KNeighborsClassifier'] = KNeighborsClassifier(n_neighbors = 18) #в параметре передаем кол-во соседей
